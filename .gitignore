@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv
+venv/
+ENV/
+
+# Secrets and Environment
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Vector DB / Local data
+data/index_storage/
+*.csv
+
+# ML / LLM models
+models/
+*.gguf
+*.bin
+*.pt
+*.onnx

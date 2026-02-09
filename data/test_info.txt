@@ -1,0 +1,1 @@
+"The AI Co-Pilot Adoption project started in February 2026. Our main goal is to automate internal documentation tasks using FastAPI and OpenAI. We are currently working on the ingestion phase using a MacBook Air."
