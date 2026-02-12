@@ -4,7 +4,7 @@ uvicorn==0.27.0
 python-multipart==0.0.6
 pydantic-settings==2.1.0
 
-# API Client (REQUIRED for Groq Adapter)
+# API Client (Required for Groq)
 requests==2.31.0
 
 # AI Core
@@ -15,7 +15,7 @@ langchain==0.1.0
 langchain-community==0.0.12
 langchain-huggingface==0.0.3
 faiss-cpu==1.7.4
-# Updated to avoid conflict with langchain-huggingface
+# We loosen this to allow langchain-huggingface to install its required >=2.6.0
 sentence-transformers>=2.6.0
 
 # Telemetry & Monitoring
