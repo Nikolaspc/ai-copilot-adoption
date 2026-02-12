@@ -4,11 +4,11 @@ uvicorn==0.27.0
 python-multipart==0.0.6
 pydantic-settings==2.1.0
 
-# API Client (REQUIRED for Groq Adapter)
+# API Client (REQUIRED for Groq)
 requests==2.31.0
 
-# AI Core
-llama-cpp-python==0.2.32
+# AI Core - Commented out to speed up CI/CD (using Groq API instead)
+# llama-cpp-python==0.2.32
 
 # RAG & Document Processing
 langchain>=0.1.0
