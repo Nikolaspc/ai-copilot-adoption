@@ -4,22 +4,21 @@ uvicorn==0.27.0
 python-multipart==0.0.6
 pydantic-settings==2.1.0
 
-# API Client (Required for Groq)
+# API Client (REQUIRED for Groq Adapter)
 requests==2.31.0
 
 # AI Core
 llama-cpp-python==0.2.32
 
 # RAG & Document Processing
-langchain==0.1.0
-langchain-community==0.0.12
-langchain-huggingface==0.0.3
-faiss-cpu==1.7.4
-# We loosen this to allow langchain-huggingface to install its required >=2.6.0
+langchain>=0.1.0
+langchain-community>=0.0.12
+langchain-huggingface
+faiss-cpu>=1.7.4
 sentence-transformers>=2.6.0
 
 # Telemetry & Monitoring
-pandas==2.2.0
+pandas>=2.0.0
 
 # Testing
-pytest==8.0.0
+pytest>=8.0.0
