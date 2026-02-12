@@ -1,29 +1,31 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.venv
+# --- Python Environment ---
 venv/
-ENV/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# Secrets and Environment
+# --- Environment Variables & Secrets ---
+# Never upload your real API keys!
 .env
 .env.local
 
-# IDEs
-.vscode/
-.idea/
+# --- Vector DB & Local Data ---
+# We exclude the index files; the user will rebuild them using your scripts.
+data/faiss_index/
+data/raw_docs/*.pdf
+# Exception: Include one small anonymous sample for testing [cite: 16]
+!data/raw_docs/sample_anonymized.pdf
 
-# OS
+# --- Logs & Metrics ---
+# Exclude actual logs but keep the folder structure if needed
+data/*.csv
+!data/metrics.csv_template
+
+# --- OS Specific ---
 .DS_Store
+Thumbs.db
 
-# Vector DB / Local data
-data/index_storage/
-*.csv
-
-# ML / LLM models
-models/
-*.gguf
-*.bin
-*.pt
-*.onnx
+# --- Infrastructure ---
+.docker/

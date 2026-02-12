@@ -1,89 +1,101 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+import uvicorn
 import os
+import time
 
 # Internal imports
-from app.utils.redactor import PIIRedactor
-from app.core.llm_adapter import LLMAdapter
-from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
+try:
+    from app.core.rag_engine import RAGEngine
+    from app.core.llm_adapter import LLMAdapter
+    from app.core.telemetry import log_interaction
+except ImportError:
+    from core.rag_engine import RAGEngine
+    from core.llm_adapter import LLMAdapter
+    from core.telemetry import log_interaction
 
-app = FastAPI(title="AI Co-Pilot API")
+app = FastAPI(
+    title="AI Co-Pilot Adoption API",
+    description="RAG-powered Assistant with Telemetry & Memory",
+    version="1.2.0"
+)
 
-# --- CORS Configuration ---
-# This allows your frontend (port 3000) to talk to your backend (port 8000)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For production, replace with ["http://localhost:3000"]
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize components once to optimize memory on your Mac
-redactor = PIIRedactor()
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-# Ensure TinyLlama is ready via PyTorch 2.2.2
-llm = LLMAdapter()
-
-class QueryRequest(BaseModel):
-    user_id: str
+class ChatRequest(BaseModel):
     query: str
 
-@app.get("/health")
-def health_check():
-    """Service health check endpoint."""
-    return {"status": "healthy", "model": "TinyLlama-1.1B"}
+class FeedbackRequest(BaseModel):
+    query: str
+    feedback: str # "thumbs_up" or "thumbs_down"
 
-@app.post("/api/query")
-async def process_query(request: QueryRequest):
-    """
-    Main RAG endpoint:
-    1. Redacts PII
-    2. Searches FAISS for context
-    3. Generates response using Local LLM
-    """
-    # 1. Privacy Filter
-    clean_query = redactor.redact(request.query)
-    
-    index_path = "data/faiss_index"
-    if not os.path.exists(index_path):
-        return {
-            "query_id": "error",
-            "answer": "Knowledge base not indexed yet. Please run ingest.py first.",
-            "provenance": []
-        }
+# Global state
+rag_engine = None
+llm_adapter = None
+chat_history = [] 
 
+@app.on_event("startup")
+async def startup_event():
+    global rag_engine, llm_adapter
+    print("\n--- 🚀 Starting AI Co-Pilot Server (Sprint 3: Telemetry) ---")
     try:
-        # 2. Retrieval (RAG)
-        vectorstore = FAISS.load_local(
-            index_path, 
-            embeddings, 
-            allow_dangerous_deserialization=True
-        )
-        
-        # Search for the top 3 relevant chunks
-        docs = vectorstore.similarity_search(clean_query, k=3)
-        context_text = " ".join([d.page_content for d in docs])
-        sources = list(set([d.metadata.get('source', 'unknown') for d in docs]))
-        
-        # 3. Generation (Local LLM)
-        # We build a prompt that forces the AI to use the retrieved context
-        refined_prompt = f"Context: {context_text}\n\nQuestion: {clean_query}\n\nAnswer:"
-        ai_response = llm.generate_response(refined_prompt)
-        
-        return {
-            "query_id": "req-local-rag",
-            "answer": ai_response,
-            "provenance": sources
-        }
-        
+        rag_engine = RAGEngine()
+        print("✅ FAISS Index loaded.")
     except Exception as e:
-        print(f"Error during RAG flow: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error during generation.")
+        print(f"⚠️ FAISS Warning: {e}")
+    llm_adapter = LLMAdapter()
+    print("✅ LLM Adapter ready.")
+
+@app.get("/")
+async def root():
+    return {"status": "online", "metrics_endpoint": "/api/metrics"}
+
+@app.post("/chat")
+async def chat_endpoint(request: ChatRequest):
+    global chat_history
+    if not rag_engine or not llm_adapter:
+        raise HTTPException(status_code=503, detail="System not ready.")
+
+    start_time = time.time()
+    
+    # 1. Retrieval
+    context = rag_engine.search(request.query, k=2)
+
+    # 2. Memory & Prompt Construction
+    recent_history = "\n".join(chat_history[-4:])
+    combined_prompt = f"Context:\n{context}\n\nHistory:\n{recent_history}\n\nUser: {request.query}"
+
+    # 3. Generation
+    answer = llm_adapter.generate_response(combined_prompt)
+    
+    # 4. Telemetry (KPI: Latency)
+    latency_ms = (time.time() - start_time) * 1000
+    log_interaction(request.query, latency_ms, status="success") # [cite: 8, 154]
+    
+    # 5. History Update
+    chat_history.append(f"User: {request.query}")
+    chat_history.append(f"AI: {answer}")
+    
+    return {
+        "response": answer,
+        "latency_ms": round(latency_ms, 2)
+    }
+
+@app.get("/api/metrics")
+async def get_metrics():
+    """Export KPIs to CSV for stakeholders."""
+    file_path = "data/metrics.csv"
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type='text/csv', filename="kpi_metrics.csv")
+    raise HTTPException(status_code=404, detail="No metrics found yet.")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -1,0 +1,19 @@
+# Web Framework
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+pydantic-settings==2.1.0
+
+# AI Core (Optimized for CPU/GGUF)
+# Note: On Mac, this will use Metal if available
+llama-cpp-python==0.2.32
+
+# RAG & Document Processing
+langchain==0.1.0
+langchain-community==0.0.12
+langchain-huggingface==0.0.3
+faiss-cpu==1.7.4
+sentence-transformers==2.3.1
+
+# Telemetry & Monitoring
+pandas==2.2.0

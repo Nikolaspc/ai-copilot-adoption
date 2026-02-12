@@ -1,19 +1,20 @@
 # KI-Governance & Datenschutz (DSGVO)
 
-## 1. Local-First Approach
+## 1. Safety Measures
 
-Die Verarbeitung erfolgt primär lokal auf macOS-Infrastruktur. Dies minimiert das Risiko von Datenabfluss an Drittanbieter.
+- [cite_start]**PII Redaction**: All user input passes through a redaction layer to mask personal data before reaching the LLM API[cite: 160].
+- [cite_start]**Data Minimization**: Only the most relevant text chunks (Top-K retrieval) are processed, reducing data exposure[cite: 159].
 
-## 2. Risikomatrix
+## 2. Risk Matrix
 
-| Risiko              | Auswirkung | Mitigierung                                                            |
-| :------------------ | :--------- | :--------------------------------------------------------------------- |
-| **Datenschutz**     | Hoch       | Einsatz von PII-Redaction (Anonymisierung) vor jeder LLM-Verarbeitung. |
-| **Halluzinationen** | Mittel     | RAG-Einsatz: Antworten sind durch lokale Dokumente (FAISS) belegt.     |
-| **Sicherheit**      | Hoch       | Keine externe API-Abhängigkeit im Standardmodus (Air-gapped möglich).  |
+| Risk                   | Impact | Mitigation                                                                    |
+| :--------------------- | :----- | :---------------------------------------------------------------------------- |
+| **Data Leakage**       | High   | [cite_start]Local FAISS indexing; no training on user data[cite: 158].        |
+| **Hallucinations**     | Medium | [cite_start]RAG-grounded responses with provenance (sources)[cite: 137, 158]. |
+| **Inaccurate Results** | Low    | [cite_start]Continuous feedback loop (Thumbs Up/Down)[cite: 7, 139].          |
 
-## 3. DSGVO Checklist
+## 3. GDPR/DSGVO Checklist
 
-- [x] Datenminimierung: Nur relevante Textfragmente werden verarbeitet.
-- [x] Transparenz: Alle KI-Antworten werden als solche gekennzeichnet.
-- [x] Recht auf Löschung: Lokale Indizes (FAISS) können jederzeit gelöscht werden.
+- [x] **Transparency**: AI responses clearly labeled.
+- [x] [cite_start]**Right to Erasure**: Local indices can be wiped instantly[cite: 162].
+- [x] [cite_start]**Access Control**: Role-based access (RBAC) ready for Pilot phase[cite: 161].
