@@ -6,10 +6,10 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """
     Settings for Groq API.
-    Fastest inference engine for RAG.
+    Fastest inference engine for RAG applications.
     """
     groq_api_key: str = os.getenv("GROQ_API_KEY", "missing_key")
-    # Llama 3.3 70B es un modelo de élite disponible gratis en Groq
+    # Using Llama 3.3 70B for high-quality reasoning
     model_name: str = "llama-3.3-70b-versatile"
 
     class Config:
@@ -28,26 +28,62 @@ class LLMAdapter:
         else:
             print(f"✅ Groq Engine Ready (Model: {self.model})")
 
-    def generate_response(self, prompt: str, max_tokens: int = 500) -> str:
+    def _detect_intent(self, prompt: str):
+        """
+        Internal logic to switch system prompts based on user intent.
+        Addresses requirements: RAG, Summarization, and Action Item Extraction.
+        """
+        query = prompt.lower()
+        
+        # Default RAG / Chat intent
+        system_instruction = (
+            "You are a Senior AI Lead. Use the provided context to answer "
+            "the question concisely and professionally."
+        )
+        temperature = 0.2
+
+        # Summarization intent
+        if any(word in query for word in ["summar", "resum", "recap"]):
+            system_instruction = (
+                "You are an Executive Assistant. Create a structured summary "
+                "of the provided text using bullet points for key topics."
+            )
+            temperature = 0.5  # Slightly higher for better prose
+        
+        # Action Items intent
+        elif any(word in query for word in ["action", "task", "todo", "tarea"]):
+            system_instruction = (
+                "You are a Project Manager. Extract a clear list of actionable items, "
+                "deadlines, and owners from the text. Use a checkbox format."
+            )
+            temperature = 0.1 # Very focused and literal
+
+        return system_instruction, temperature
+
+    def generate_response(self, prompt: str, max_tokens: int = 1000) -> str:
+        """
+        Orchestrates the LLM request with dynamic system prompts.
+        """
         if self.api_key == "missing_key":
             return "Configuration Error: Check your .env file."
         
+        system_msg, temp = self._detect_intent(prompt)
+        
         try:
-            # Groq API uses the same format as OpenAI
             payload = {
                 "model": self.model,
                 "messages": [
                     {
                         "role": "system", 
-                        "content": "You are a Senior AI Lead. Use the provided context to answer the question concisely and professionally."
+                        "content": system_msg
                     },
                     {
                         "role": "user", 
-                        "content": f"Context from FAISS: {prompt}\n\nQuestion: Based on the context, what is the status and goal of the project?"
+                        "content": f"Context provided: {prompt}\n\nPlease process the input accordingly."
                     }
                 ],
                 "max_tokens": max_tokens,
-                "temperature": 0.2
+                "temperature": temp
             }
 
             response = requests.post(
@@ -57,7 +93,7 @@ class LLMAdapter:
                     "Content-Type": "application/json"
                 },
                 data=json.dumps(payload),
-                timeout=20
+                timeout=25
             )
             
             if response.status_code != 200:

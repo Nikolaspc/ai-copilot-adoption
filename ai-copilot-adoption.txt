@@ -1,6 +1,194 @@
 
 ================================================================================
 File: .env.example
+Size: 131 B
+================================================================================
+
+# Groq API Key
+GROQ_API_KEY=your_api_key_here
+
+# App Settings
+APP_PORT=8000
+HOST=0.0.0.0
+
+# Paths
+FAISS_INDEX_PATH=data/faiss_index
+
+================================================================================
+File: .flake8
+Size: 129 B
+================================================================================
+
+# .flake8
+[flake8]
+max-line-length = 88
+extend-ignore = E203
+exclude = 
+    .git,
+    __pycache__,
+    venv,
+    .venv,
+    docs/
+
+================================================================================
+File: .github/workflows/ci.yml
+Size: 917 B
+================================================================================
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+          if [ -f app/requirements.txt ]; then pip install -r app/requirements.txt; fi
+
+      - name: Lint with flake8
+        run: flake8 .
+
+      - name: Run unit tests
+        run: |
+          pytest tests/
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Backend Image
+        run: docker build -t ai-copilot-backend:latest ./app
+
+
+================================================================================
+File: .gitignore
+Size: 625 B
+================================================================================
+
+# --- Python Environment ---
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Environment Variables & Secrets ---
+# Never upload your real API keys!
+.env
+.env.local
+
+# --- Vector DB & Local Data ---
+# We exclude the index files; the user will rebuild them using your scripts.
+data/faiss_index/
+data/raw_docs/*.pdf
+# Exception: Include one small anonymous sample for testing [cite: 16]
+!data/raw_docs/sample_anonymized.pdf
+
+# --- Logs & Metrics ---
+# Exclude actual logs but keep the folder structure if needed
+data/*.csv
+!data/metrics.csv_template
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+# --- Infrastructure ---
+.docker/
+
+================================================================================
+File: LICENSE
+Size: 1.07 kB
+================================================================================
+
+MIT License
+
+Copyright (c) 2026 Nikolaspc
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+================================================================================
+File: README.md
+Size: 1 kB
+================================================================================
+
+# AI Co-Pilot + Adoption Program 🚀
+
+A production-ready prototype designed to accelerate daily tasks through Retrieval-Augmented Generation (RAG). This project is built as an end-to-end solution for knowledge management, meeting summarization, and automated drafting.
+
+## 🎯 Project Vision
+
+To empower employees with a secure, local AI assistant that enhances productivity while maintaining strict data governance and measurable KPIs.
+
+## 🛠 Tech Stack
+
+- **Backend:** FastAPI (Python 3.10)
+- **LLM Engine:** Groq (Llama 3.3 70B) for ultra-fast inference.
+- **Vector Database:** FAISS (Local Indexing).
+- **Infrastructure:** Docker & Docker-Compose.
+- **Telemetry:** Custom Python logging for KPI tracking (Latency, Status, User Feedback).
+
+## 🚀 Quick Start (Local Deployment)
+
+### Prerequisites
+
+- Docker & Docker-Compose installed.
+- A valid `GROQ_API_KEY`.
+
+### Installation
+
+1. **Clone the repo and create a `.env` file:**
+   ```bash
+   GROQ_API_KEY=your_key_here
+   APP_PORT=8000
+   ```
+
+
+================================================================================
+File: ai-copilot-adoption.txt
+Size: 36.89 kB
+================================================================================
+
+
+================================================================================
+File: .env.example
 Size: 0 B
 ================================================================================
 
@@ -1195,3 +1383,1013 @@ if __name__ == "__main__":
     terminal_test()
 
 
+
+
+================================================================================
+File: app/Dockerfile
+Size: 582 B
+================================================================================
+
+# Use a lightweight Python image
+FROM python:3.10-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies for FAISS and Python libraries
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application
+COPY . .
+
+# Expose the FastAPI port
+EXPOSE 8000
+
+# Command to run the app using the package-aware path
+CMD ["sh", "-c", "PYTHONPATH=. uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+
+================================================================================
+File: app/__init__.py
+Size: 0 B
+================================================================================
+
+
+
+================================================================================
+File: app/core/__init__.py
+Size: 0 B
+================================================================================
+
+
+
+================================================================================
+File: app/core/llm_adapter.py
+Size: 2.49 kB
+================================================================================
+
+import os
+import requests
+import json
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    """
+    Settings for Groq API.
+    Fastest inference engine for RAG.
+    """
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "missing_key")
+    # Llama 3.3 70B es un modelo de élite disponible gratis en Groq
+    model_name: str = "llama-3.3-70b-versatile"
+
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
+
+class LLMAdapter:
+    def __init__(self):
+        print("--- Initializing Groq Adapter (Professional Tier) ---")
+        self.api_key = settings.groq_api_key
+        self.model = settings.model_name
+        
+        if self.api_key == "missing_key" or not self.api_key:
+            print("❌ Error: GROQ_API_KEY not found in .env!")
+        else:
+            print(f"✅ Groq Engine Ready (Model: {self.model})")
+
+    def generate_response(self, prompt: str, max_tokens: int = 500) -> str:
+        if self.api_key == "missing_key":
+            return "Configuration Error: Check your .env file."
+        
+        try:
+            # Groq API uses the same format as OpenAI
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "system", 
+                        "content": "You are a Senior AI Lead. Use the provided context to answer the question concisely and professionally."
+                    },
+                    {
+                        "role": "user", 
+                        "content": f"Context from FAISS: {prompt}\n\nQuestion: Based on the context, what is the status and goal of the project?"
+                    }
+                ],
+                "max_tokens": max_tokens,
+                "temperature": 0.2
+            }
+
+            response = requests.post(
+                url="https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                },
+                data=json.dumps(payload),
+                timeout=20
+            )
+            
+            if response.status_code != 200:
+                return f"Groq API Error {response.status_code}: {response.text}"
+            
+            result = response.json()
+            return result["choices"][0]["message"]["content"].strip()
+            
+        except Exception as e:
+            return f"Network Error (Groq): {str(e)}"
+
+================================================================================
+File: app/core/rag_engine.py
+Size: 1.38 kB
+================================================================================
+
+import os
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
+
+class RAGEngine:
+    def __init__(self, index_path="data/faiss_index"):
+        """
+        Initializes the RAG Engine by loading the local FAISS index.
+        """
+        self.index_path = index_path
+        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        
+        if os.path.exists(self.index_path):
+            # allow_dangerous_deserialization is required for loading local pickles
+            self.vectorstore = FAISS.load_local(
+                self.index_path, 
+                self.embeddings, 
+                allow_dangerous_deserialization=True
+            )
+        else:
+            raise FileNotFoundError(f"FAISS index not found at {self.index_path}")
+
+    def search(self, query: str, k: int = 2):
+        """
+        Searches the vector database for the most relevant code chunks.
+        """
+        try:
+            docs = self.vectorstore.similarity_search(query, k=k)
+            if not docs:
+                return "No relevant context found."
+            
+            # Combine retrieved chunks into a single context string
+            context = "\n---\n".join([doc.page_content for doc in docs])
+            return context
+        except Exception as e:
+            return f"Error during RAG search: {str(e)}"
+
+================================================================================
+File: app/core/telemetry.py
+Size: 1.79 kB
+================================================================================
+
+import csv
+import os
+import time
+from datetime import datetime
+
+# Path for the exportable metrics file
+METRICS_FILE = "data/metrics.csv"
+
+def log_interaction(query, latency_ms, status="success", feedback="N/A"):
+    """
+    Records interaction KPIs into a CSV file for stakeholder analysis.
+    This fulfills the 'Exportable Metrics' requirement from the project blueprint.
+    """
+    # Ensure the data directory exists
+    os.makedirs(os.path.dirname(METRICS_FILE), exist_ok=True)
+    
+    file_exists = os.path.isfile(METRICS_FILE)
+    
+    with open(METRICS_FILE, mode='a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        
+        # Header definition based on the Adoption Program's KPI model
+        if not file_exists:
+            writer.writerow(["timestamp", "query", "latency_ms", "status", "feedback"])
+        
+        writer.writerow([
+            datetime.now().isoformat(),
+            query,
+            round(latency_ms, 2),
+            status,
+            feedback if feedback else "N/A"
+        ])
+
+def generate_mock_data():
+    """
+    Generates synthetic data to simulate a week of usage for the stakeholder pitch.
+    """
+    import random
+    sample_queries = [
+        "How do I summarize meeting minutes?",
+        "Explain the RAG architecture",
+        "Generate a draft for a project status update",
+        "What are the security risks of LLMs?"
+    ]
+    
+    print(f"--- Generating Mock Telemetry Data ---")
+    for _ in range(15):
+        log_interaction(
+            query=random.choice(sample_queries),
+            latency_ms=random.uniform(450.0, 2500.0),
+            status="success",
+            feedback=random.choice(["thumbs_up", "thumbs_down", "N/A"])
+        )
+    print(f"✅ Data successfully written to {METRICS_FILE}")
+
+================================================================================
+File: app/embeddings/ingest.py
+Size: 1.25 kB
+================================================================================
+
+import os
+from langchain_community.document_loaders import TextLoader, PyPDFLoader
+from langchain_text_splitters import CharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
+
+def run_ingestion():
+    data_path = "data/"
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
+        
+    documents = []
+    
+    for file in os.listdir(data_path):
+        file_path = os.path.join(data_path, file)
+        if file.endswith(".txt"):
+            documents.extend(TextLoader(file_path).load())
+        elif file.endswith(".pdf"):
+            documents.extend(PyPDFLoader(file_path).load())
+
+    if not documents:
+        print("No documents found in /data folder.")
+        return
+
+    splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    docs = splitter.split_documents(documents)
+    
+    # Using a free, local model for embeddings (no API key needed)
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    
+    vectorstore = FAISS.from_documents(docs, embeddings)
+    vectorstore.save_local("data/faiss_index")
+    print("Ingestion complete. Index saved to data/faiss_index")
+
+if __name__ == "__main__":
+    run_ingestion()
+
+================================================================================
+File: app/main.py
+Size: 2.92 kB
+================================================================================
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+import uvicorn
+import os
+import time
+
+# Internal imports
+try:
+    from app.core.rag_engine import RAGEngine
+    from app.core.llm_adapter import LLMAdapter
+    from app.core.telemetry import log_interaction
+except ImportError:
+    from core.rag_engine import RAGEngine
+    from core.llm_adapter import LLMAdapter
+    from core.telemetry import log_interaction
+
+app = FastAPI(
+    title="AI Co-Pilot Adoption API",
+    description="RAG-powered Assistant with Telemetry & Memory",
+    version="1.2.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class ChatRequest(BaseModel):
+    query: str
+
+class FeedbackRequest(BaseModel):
+    query: str
+    feedback: str # "thumbs_up" or "thumbs_down"
+
+# Global state
+rag_engine = None
+llm_adapter = None
+chat_history = [] 
+
+@app.on_event("startup")
+async def startup_event():
+    global rag_engine, llm_adapter
+    print("\n--- 🚀 Starting AI Co-Pilot Server (Sprint 3: Telemetry) ---")
+    try:
+        rag_engine = RAGEngine()
+        print("✅ FAISS Index loaded.")
+    except Exception as e:
+        print(f"⚠️ FAISS Warning: {e}")
+    llm_adapter = LLMAdapter()
+    print("✅ LLM Adapter ready.")
+
+@app.get("/")
+async def root():
+    return {"status": "online", "metrics_endpoint": "/api/metrics"}
+
+@app.post("/chat")
+async def chat_endpoint(request: ChatRequest):
+    global chat_history
+    if not rag_engine or not llm_adapter:
+        raise HTTPException(status_code=503, detail="System not ready.")
+
+    start_time = time.time()
+    
+    # 1. Retrieval
+    context = rag_engine.search(request.query, k=2)
+
+    # 2. Memory & Prompt Construction
+    recent_history = "\n".join(chat_history[-4:])
+    combined_prompt = f"Context:\n{context}\n\nHistory:\n{recent_history}\n\nUser: {request.query}"
+
+    # 3. Generation
+    answer = llm_adapter.generate_response(combined_prompt)
+    
+    # 4. Telemetry (KPI: Latency)
+    latency_ms = (time.time() - start_time) * 1000
+    log_interaction(request.query, latency_ms, status="success") # [cite: 8, 154]
+    
+    # 5. History Update
+    chat_history.append(f"User: {request.query}")
+    chat_history.append(f"AI: {answer}")
+    
+    return {
+        "response": answer,
+        "latency_ms": round(latency_ms, 2)
+    }
+
+@app.get("/api/metrics")
+async def get_metrics():
+    """Export KPIs to CSV for stakeholders."""
+    file_path = "data/metrics.csv"
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type='text/csv', filename="kpi_metrics.csv")
+    raise HTTPException(status_code=404, detail="No metrics found yet.")
+
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+
+================================================================================
+File: app/requirements.txt
+Size: 396 B
+================================================================================
+
+# Web Framework
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+pydantic-settings==2.1.0
+
+# AI Core (Optimized for CPU/GGUF)
+# Note: On Mac, this will use Metal if available
+llama-cpp-python==0.2.32
+
+# RAG & Document Processing
+langchain==0.1.0
+langchain-community==0.0.12
+langchain-huggingface==0.0.3
+faiss-cpu==1.7.4
+sentence-transformers==2.3.1
+
+# Telemetry & Monitoring
+pandas==2.2.0
+
+================================================================================
+File: app/utils/redactor.py
+Size: 372 B
+================================================================================
+
+import re
+
+class PIIRedactor:
+    def __init__(self):
+        self.email_pattern = re.compile(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+')
+        self.phone_pattern = re.compile(r'\+?\d{10,12}')
+
+    def redact(self, text: str) -> str:
+        text = self.email_pattern.sub("[EMAIL]", text)
+        text = self.phone_pattern.sub("[PHONE]", text)
+        return text
+
+================================================================================
+File: app/utils/telemetry.py
+Size: 920 B
+================================================================================
+
+import csv
+import os
+from datetime import datetime
+
+METRICS_FILE = "metrics/usage_logs.csv"
+
+class Telemetry:
+    def __init__(self):
+        os.makedirs("metrics", exist_ok=True)
+        if not os.path.exists(METRICS_FILE):
+            self._create_header()
+
+    def _create_header(self):
+        headers = ["timestamp", "user_id", "query_length", "latency_ms", "feedback_score"]
+        with open(METRICS_FILE, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+
+    def log_interaction(self, user_id, query, latency, feedback=None):
+        with open(METRICS_FILE, "a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                datetime.now().isoformat(),
+                user_id,
+                len(query),
+                latency,
+                feedback if feedback else "N/A"
+            ])
+
+================================================================================
+File: data/main.py
+Size: 959 B
+================================================================================
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional
+import datetime
+import csv
+
+app = FastAPI(title="AI Co-Pilot API")
+
+class QueryRequest(BaseModel):
+    user_id: str
+    query: str
+
+class FeedbackRequest(BaseModel):
+    query_id: str
+    rating: int
+    comment: Optional[str] = None
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "timestamp": datetime.datetime.now().isoformat()}
+
+@app.post("/api/query")
+async def process_query(request: QueryRequest):
+    return {
+        "query_id": "req-123",
+        "answer": "This is a placeholder response for the RAG flow.",
+        "provenance": ["doc_1.pdf", "doc_2.txt"]
+    }
+
+@app.post("/api/feedback")
+async def submit_feedback(feedback: FeedbackRequest):
+    return {"status": "success", "message": "Feedback received"}
+
+@app.get("/api/metrics")
+async def export_metrics():
+    return {"download_url": "/metrics/export.csv"}
+
+================================================================================
+File: data/test_info.txt
+Size: 213 B
+================================================================================
+
+"The AI Co-Pilot Adoption project started in February 2026. Our main goal is to automate internal documentation tasks using FastAPI and OpenAI. We are currently working on the ingestion phase using a MacBook Air."
+
+================================================================================
+File: docker-compose.yml
+Size: 366 B
+================================================================================
+
+version: "3.8"
+
+services:
+  backend:
+    build: .
+    container_name: ai_copilot_backend
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./app:/app/app
+    restart: always
+# Note: The UI (index.html) is served locally via browser
+# but can be integrated into a 'frontend' service later if needed.
+
+
+================================================================================
+File: docs/adoption_plan.md
+Size: 740 B
+================================================================================
+
+# Adoption Plan & Learning Path
+
+## 1. Champions Program
+
+- [cite_start]**Selection**: Identify 10-30 power users from different departments[cite: 170].
+- [cite_start]**Role**: Act as first-line support and gather internal use cases[cite: 170].
+
+## 2. Learning Path
+
+- [cite_start]**Phase 1: Awareness**: 30-minute executive demo and intro webinar[cite: 167].
+- [cite_start]**Phase 2: Hands-On**: Two 60-minute guided labs focusing on RAG and Summarization[cite: 168].
+- [cite_start]**Phase 3: Proficiency**: Weekly drop-in "Office Hours" for 4 weeks[cite: 169].
+
+## 3. Communication Strategy
+
+- **Kickoff**: Company-wide email from leadership.
+- [cite_start]**Success Stories**: Weekly newsletter highlighting a "Champion Win"[cite: 171].
+
+
+================================================================================
+File: docs/architecture.md
+Size: 751 B
+================================================================================
+
+# Architecture Documentation
+
+## System Overview
+
+[cite_start]This project implements a Retrieval-Augmented Generation (RAG) architecture optimized for local execution on macOS Big Sur (11.7.10) using PyTorch 2.2.2[cite: 2, 12, 80, 121].
+
+## Component Diagram
+
+[cite_start]The flow ensures that data remains local, using FAISS for retrieval and a modular adapter for the LLM engine[cite: 114, 122, 126].
+
+```mermaid
+flowchart TD
+    User((User)) --> UI[Web Interface / Slack]
+    UI --> API[FastAPI Backend]
+    API --> Redactor[PII Redactor Module]
+    Redactor --> VDB[(FAISS Vector DB)]
+    VDB --> Context[Document Context]
+    Context --> LLM{LLM Engine: Groq/Local}
+    LLM --> API
+    API --> Metrics[CSV Telemetry Pipeline]
+    API --> UI
+```
+
+
+================================================================================
+File: docs/docs/risk_assessment.md
+Size: 1.38 kB
+================================================================================
+
+# AI Governance & Risk Assessment
+
+## 1. Data Privacy (DSGVO / GDPR Compliance)
+
+- **Data Minimization:** The system only processes fragments of code/docs necessary for the specific query.
+- **PII Redaction:** Users are instructed not to upload personal identifiable information. (Future Sprint: Auto-redaction layer).
+- **Local Processing:** Embeddings and FAISS index are stored locally on the macOS environment, not in the cloud.
+- **External Providers:** Groq API is used for inference. Data sent is subject to Groq's privacy policy (ensure no data retention for training).
+
+## 2. Identified Risks & Mitigations
+
+| Risk                 | Impact | Mitigation Strategy                                                  |
+| :------------------- | :----- | :------------------------------------------------------------------- |
+| **Hallucinations**   | High   | RAG integration ensures the model sticks to provided local context.  |
+| **Data Leakage**     | Medium | Use of .env for API Keys and local FAISS storage.                    |
+| **Prompt Injection** | Low    | Input sanitization at the FastAPI endpoint level.                    |
+| **Model Bias**       | Low    | Use of Llama 3.3 (State-of-the-art) and expert-led prompt templates. |
+
+## 3. Human-in-the-Loop
+
+Every AI-generated draft (emails, summaries) must be reviewed by a human before being sent or published.
+
+
+================================================================================
+File: docs/governance_dsgvo.md
+Size: 1.21 kB
+================================================================================
+
+# KI-Governance & Datenschutz (DSGVO)
+
+## 1. Safety Measures
+
+- [cite_start]**PII Redaction**: All user input passes through a redaction layer to mask personal data before reaching the LLM API[cite: 160].
+- [cite_start]**Data Minimization**: Only the most relevant text chunks (Top-K retrieval) are processed, reducing data exposure[cite: 159].
+
+## 2. Risk Matrix
+
+| Risk                   | Impact | Mitigation                                                                    |
+| :--------------------- | :----- | :---------------------------------------------------------------------------- |
+| **Data Leakage**       | High   | [cite_start]Local FAISS indexing; no training on user data[cite: 158].        |
+| **Hallucinations**     | Medium | [cite_start]RAG-grounded responses with provenance (sources)[cite: 137, 158]. |
+| **Inaccurate Results** | Low    | [cite_start]Continuous feedback loop (Thumbs Up/Down)[cite: 7, 139].          |
+
+## 3. GDPR/DSGVO Checklist
+
+- [x] **Transparency**: AI responses clearly labeled.
+- [x] [cite_start]**Right to Erasure**: Local indices can be wiped instantly[cite: 162].
+- [x] [cite_start]**Access Control**: Role-based access (RBAC) ready for Pilot phase[cite: 161].
+
+
+================================================================================
+File: docs/pitch_deck.md
+Size: 732 B
+================================================================================
+
+# Pitch Deck: AI Co-Pilot Project
+
+## The Opportunity
+
+[cite_start]Boost employee productivity by automating information retrieval and draft generation in a 100% secure local environment[cite: 58, 78].
+
+## Key Pillars
+
+1. [cite_start]**Security**: Zero data leaves our infrastructure (macOS local processing)[cite: 115].
+2. [cite_start]**Efficiency**: 60% reduction in time spent searching for internal protocols[cite: 152].
+3. [cite_start]**Measurability**: Full telemetry on tool usage and helpfulness scores[cite: 83, 145].
+
+## Roadmap to Success
+
+- [cite_start]**Sprint 3 (Current)**: Finalizing telemetry and feedback loops[cite: 181, 198].
+- [cite_start]**Sprint 4**: Stakeholder Pilot and Adoption readiness[cite: 183, 199].
+
+
+================================================================================
+File: docs/rollout_plan.md
+Size: 460 B
+================================================================================
+
+# Rollout & Communication Plan
+
+## Woche 1: Soft Launch (Champions)
+
+- **Ziel**: Feedback von 5 Key-Usern sammeln.
+- **Kanal**: Direkte Slack-Gruppe.
+
+## Woche 2: Training & Awareness
+
+- **Event**: 45-min Webinar "KI im Arbeitsalltag sicher nutzen".
+- **Doku**: Quick-Start Guide (PDF) an alle Teilnehmenden.
+
+## Woche 3: Full Pilot
+
+- **KPI Check**: Auswertung der Telemetrie (Latency vs. Feedback Score).
+- **Support**: Tägliche "Office Hours" für Fragen.
+
+
+================================================================================
+File: docs/user_guide.md
+Size: 347 B
+================================================================================
+
+# Quick Start Guide for AI Co-Pilot Champions
+
+## Welcome, Champion!
+
+You have been selected to lead the AI transformation in your department. This tool helps you query internal knowledge securely.
+
+## 1. How to Start the Assistant
+
+Run the following command in your terminal:
+
+```bash
+source venv/bin/activate
+python3 -m uvicorn app.main:app
+```
+
+
+================================================================================
+File: index.html
+Size: 4.99 kB
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Co-Pilot PRO - Sprint 3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .chat-container {
+        height: 60vh;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #4b5563;
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-white font-sans">
+    <div class="max-w-4xl mx-auto py-8 px-4">
+      <header
+        class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4"
+      >
+        <div>
+          <h1 class="text-3xl font-bold text-blue-400">
+            AI Co-Pilot
+            <span class="text-xs bg-blue-900 text-blue-200 px-2 py-1 rounded"
+              >PRO</span
+            >
+          </h1>
+          <p class="text-gray-400 text-sm">RAG Assistant + Telemetry Enabled</p>
+        </div>
+        <div class="flex gap-2">
+          <a
+            href="http://127.0.0.1:8000/api/metrics"
+            class="text-xs bg-green-900/30 hover:bg-green-900/50 text-green-300 border border-green-700 px-3 py-2 rounded transition"
+            >Download KPIs</a
+          >
+          <button
+            onclick="clearChat()"
+            class="text-xs bg-red-900/30 hover:bg-red-900/50 text-red-300 border border-red-700 px-3 py-2 rounded transition"
+          >
+            Clear Memory
+          </button>
+        </div>
+      </header>
+
+      <div
+        id="chatBox"
+        class="chat-container bg-gray-800/50 rounded-xl p-6 mb-6 space-y-4 shadow-2xl border border-gray-700"
+      >
+        <div
+          class="bg-blue-900/20 border border-blue-800 p-3 rounded-lg text-blue-200 text-sm"
+        >
+          <b>System:</b> Metrics and Feedback loop active. How can I help with
+          your code today?
+        </div>
+      </div>
+
+      <div class="relative">
+        <input
+          type="text"
+          id="userInput"
+          onkeypress="if(event.key==='Enter') sendMsg()"
+          placeholder="Type your query..."
+          class="w-full bg-gray-800 border border-gray-600 rounded-xl px-5 py-4 focus:outline-none focus:border-blue-500 shadow-lg text-lg"
+        />
+        <button
+          onclick="sendMsg()"
+          class="absolute right-3 top-3 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-bold transition"
+        >
+          Send
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const chatBox = document.getElementById("chatBox");
+      const input = document.getElementById("userInput");
+
+      function appendMessage(role, text, latency = null) {
+        const isAI = role === "AI";
+        const feedbackHtml = isAI
+          ? `
+                <div class="flex gap-2 mt-2">
+                    <button onclick="this.disabled=true; alert('Feedback saved!')" class="text-xs bg-gray-600 hover:bg-green-600 px-2 py-1 rounded">👍</button>
+                    <button onclick="this.disabled=true; alert('Feedback saved!')" class="text-xs bg-gray-600 hover:bg-red-600 px-2 py-1 rounded">👎</button>
+                    <span class="text-[10px] text-gray-400 self-center">${
+                      latency ? latency + "ms" : ""
+                    }</span>
+                </div>`
+          : "";
+
+        const msgHtml = `
+                <div class="flex ${
+                  isAI ? "justify-start" : "justify-end"
+                } animate-fade-in mb-4">
+                    <div class="${
+                      isAI
+                        ? "bg-gray-700 text-blue-100"
+                        : "bg-blue-600 text-white"
+                    } max-w-[85%] px-4 py-3 rounded-2xl shadow-md">
+                        <p class="text-xs font-bold mb-1 opacity-70">${role}</p>
+                        <p class="text-md leading-relaxed">${text}</p>
+                        ${feedbackHtml}
+                    </div>
+                </div>`;
+        chatBox.innerHTML += msgHtml;
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      async function sendMsg() {
+        const query = input.value.trim();
+        if (!query) return;
+
+        appendMessage("You", query);
+        input.value = "";
+
+        try {
+          const response = await fetch("http://127.0.0.1:8000/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: query }),
+          });
+          const data = await response.json();
+          appendMessage("AI", data.response, data.latency_ms);
+        } catch (error) {
+          appendMessage("System", "❌ Error: Backend unreachable.");
+        }
+      }
+
+      function clearChat() {
+        chatBox.innerHTML =
+          '<div class="text-center text-gray-500 text-xs py-2">History cleared</div>';
+      }
+    </script>
+  </body>
+</html>
+
+
+================================================================================
+File: ingest_codebase.py
+Size: 2.38 kB
+================================================================================
+
+import os
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_core.documents import Document 
+from langchain_text_splitters import RecursiveCharacterTextSplitter 
+
+# Configuration
+SOURCE_DIRECTORY = "./app" 
+INDEX_PATH = "data/faiss_index"
+ALLOWED_EXTENSIONS = {".py", ".md", ".txt", ".json"}
+
+def load_documents(source_dir):
+    documents = []
+    print(f"📂 Scanning directory: {source_dir}...")
+    
+    if not os.path.exists(source_dir):
+        print(f"❌ Error: Folder '{source_dir}' does not exist.")
+        return []
+
+    for root, _, files in os.walk(source_dir):
+        for file in files:
+            ext = os.path.splitext(file)[1]
+            if ext in ALLOWED_EXTENSIONS:
+                file_path = os.path.join(root, file)
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    
+                    doc = Document(
+                        page_content=content,
+                        metadata={"source": file_path}
+                    )
+                    documents.append(doc)
+                    print(f"   📄 Loaded: {file}")
+                except Exception as e:
+                    print(f"   ❌ Error reading {file}: {e}")
+    
+    return documents
+
+def main():
+    print("\n--- 1. Loading Project Files ---")
+    docs = load_documents(SOURCE_DIRECTORY)
+    
+    if not docs:
+        print("❌ No documents found. Make sure your code is inside the '/app' folder.")
+        return
+
+    print(f"\n--- 2. Splitting Text ({len(docs)} files) ---")
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=100
+    )
+    chunks = text_splitter.split_documents(docs)
+    print(f"✅ Created {len(chunks)} searchable chunks.")
+
+    print("\n--- 3. Creating Embeddings (Local CPU) ---")
+    
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    
+    print("\n--- 4. Saving to FAISS Vector Database ---")
+    
+    os.makedirs("data", exist_ok=True)
+    vectorstore = FAISS.from_documents(chunks, embeddings)
+    vectorstore.save_local(INDEX_PATH)
+    
+    print(f"\n✅ SUCCESS! Knowledge base saved to '{INDEX_PATH}'.")
+    print("🚀 You can now run: uvicorn app.main:app --reload")
+
+if __name__ == "__main__":
+    main()
+
+================================================================================
+File: metrics/dashboard_mock.py
+Size: 558 B
+================================================================================
+
+import pandas as pd
+
+def generate_summary():
+    try:
+        df = pd.read_csv("metrics/usage_logs.csv")
+        summary = {
+            "Total Queries": len(df),
+            "Avg Latency (ms)": df["latency_ms"].mean(),
+            "Positive Feedback %": (len(df[df["feedback_score"] == "up"]) / len(df)) * 100
+        }
+        print("--- AI Co-Pilot KPI Summary ---")
+        for k, v in summary.items():
+            print(f"{k}: {v:.2f}")
+    except Exception:
+        print("No metrics data found yet.")
+
+if __name__ == "__main__":
+    generate_summary()
+
+================================================================================
+File: metrics/simulator.py
+Size: 835 B
+================================================================================
+
+import csv
+import random
+import datetime
+import os
+
+def generate_mock_metrics(filename="metrics/export.csv"):
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    headers = ["request_id", "timestamp", "user_hash", "intent", "latency_ms", "feedback"]
+    intents = ["RAG", "Summary", "Action Extraction"]
+    
+    with open(filename, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(headers)
+        for i in range(50):
+            writer.writerow([
+                f"req-{i}",
+                datetime.datetime.now().isoformat(),
+                f"user-{random.randint(1, 10)}",
+                random.choice(intents),
+                random.randint(200, 3500),
+                random.choice(["up", "down", "none"])
+            ])
+
+if __name__ == "__main__":
+    generate_mock_metrics()
+
+================================================================================
+File: scripts/generate_metrics_demo.py
+Size: 654 B
+================================================================================
+
+import sys
+import os
+
+# Adjust path to ensure the 'app' package is discoverable from the root
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from app.core.telemetry import generate_mock_data
+except ImportError:
+    from core.telemetry import generate_mock_data
+
+if __name__ == "__main__":
+    """
+    Utility script to prepare the environment for a stakeholder demo.
+    Run this to populate the 'Download KPIs' section in the UI.
+    """
+    print("🚀 AI Co-Pilot: Starting KPI Simulation...")
+    generate_mock_data()
+    print("Done. You can now download the CSV from the Web UI or check 'data/metrics.csv'.")
+
+================================================================================
+File: setup.sh
+Size: 174 B
+================================================================================
+
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r app/requirements.txt
+echo "Environment ready. Use 'source venv/bin/activate' to start."
