@@ -20,9 +20,10 @@ faiss-cpu==1.8.0
 sentence-transformers==2.2.2
 huggingface-hub==0.19.4
 
-# Config
+# Config & Settings
 python-dotenv==1.0.0
 pydantic==2.5.0
+pydantic-settings==2.1.0
 
 # Testing - VERSIONES COMPATIBLES
 pytest==7.4.4
